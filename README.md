@@ -117,3 +117,7 @@ tests/
   fixtures/indeed_salzgitter_sample.json
   test_*.py
 ```
+
+## Betrieb
+
+Der Scraper läuft auf einem Hetzner-Cloud-Server mit wöchentlichem systemd-Timer. Einrichtung und Wartung: [deploy/README.md](deploy/README.md).
