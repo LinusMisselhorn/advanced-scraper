@@ -36,7 +36,10 @@ for cmd in git curl systemctl; do
   fi
 done
 
-if ! command -v uv >/dev/null 2>&1; then
+# Feste Kopie unter /usr/local/bin, damit auch der Nutzer scraper sie ausführen kann
+# (ein uv im Home-Ordner von root wäre für ihn nicht erreichbar).
+UV=/usr/local/bin/uv
+if [[ ! -x "$UV" ]]; then
   log "uv installieren (verwaltet eine eigene Python-Version, System-Python bleibt unberührt)"
   curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin UV_NO_MODIFY_PATH=1 sh
 fi
@@ -62,9 +65,9 @@ export UV_PYTHON_INSTALL_DIR="$APP_DIR/.python"
 export UV_CACHE_DIR="$APP_DIR/.uv-cache"
 cd "$APP_DIR"
 if [[ ! -x "$APP_DIR/.venv/bin/python" ]]; then
-  sudo -u "$APP_USER" -E uv venv --quiet --python "$PYTHON_VERSION" "$APP_DIR/.venv"
+  sudo -u "$APP_USER" -E "$UV" venv --quiet --python "$PYTHON_VERSION" "$APP_DIR/.venv"
 fi
-sudo -u "$APP_USER" -E uv pip install --quiet --python "$APP_DIR/.venv/bin/python" -r requirements.txt
+sudo -u "$APP_USER" -E "$UV" pip install --quiet --python "$APP_DIR/.venv/bin/python" -r requirements.txt
 
 if [[ ! -f "$APP_DIR/.env" ]]; then
   log ".env aus Vorlage anlegen (Key muss noch eingetragen werden)"
