@@ -27,3 +27,7 @@ output/
 .vscode/
 .idea/
 .DS_Store
+
+# Deploy-Key auf dem Server
+.deploy_key
+.deploy_key.pub

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "advanced-scraper"
+version = "0.1.0"
+description = "Signal-Based-Outreach von IMPRESSION: Bedarfssignale kleiner Betriebe sammeln und in Supabase ablegen"
+requires-python = ">=3.11"
+dependencies = [
+    "python-jobspy>=1.4",
+    "pandas>=2.0",
+    "rapidfuzz>=3.0",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+include = ["scraper*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,21 @@
+[Unit]
+Description=advanced-scraper: Indeed-Stellenanzeigen als Signal 1003
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=scraper
+Group=scraper
+WorkingDirectory=/opt/advanced-scraper
+ExecStart=/opt/advanced-scraper/.venv/bin/python -m scraper.indeed_jobspy
+# Läuft neben anderen Diensten (Dialer, ai.impression-marketing.de):
+# niedrige Priorität und Speichergrenze, damit der Scraper sie nicht ausbremst.
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=1G
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+TimeoutStartSec=45min
