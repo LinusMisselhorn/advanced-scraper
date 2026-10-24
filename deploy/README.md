@@ -1,51 +1,38 @@
-# Deployment auf Hetzner Cloud
+# Deployment auf dem bestehenden Hetzner-Server
 
-Der Scraper läuft auf einem kleinen Hetzner-Cloud-Server. Die Einrichtung erledigt `cloud-init.yaml` beim ersten Start automatisch: Pakete, Python-Umgebung, Code, Firewall, systemd-Dienst und Wochen-Timer. Per Hand bleiben nur der Service-Role-Key und der erste Testlauf.
+Der Scraper läuft auf dem vorhandenen Hetzner-Server, auf dem auch der Dialer und `ai.impression-marketing.de` laufen. Das Installationsskript ist darauf ausgelegt, daneben zu existieren, ohne etwas anderes anzufassen.
 
-## Voraussetzungen
+## Was installiert wird
 
-- Hetzner-Cloud-Konto mit einem Projekt (z. B. "IMPRESSION")
-- SSH-Key auf deinem Rechner. Prüfen mit `cat ~/.ssh/id_ed25519.pub`. Falls nicht vorhanden: `ssh-keygen -t ed25519`
-- Der Scraper-Code liegt auf `main` (Pull Request von `feat/indeed-jobspy` gemergt). Sonst in `cloud-init.yaml` die Zeile `REPO_BRANCH=main` auf den gewünschten Branch ändern.
-- Das Repo ist öffentlich, deshalb kann der Server ohne Zugangsdaten klonen. Wird es privat, braucht der Server einen Deploy-Key (siehe unten).
-
-## 1. Server anlegen
-
-In der Hetzner Console: Projekt öffnen, **Server hinzufügen**.
-
-| Einstellung | Wert |
+| Bestandteil | Ort |
 |---|---|
-| Standort | Nürnberg oder Falkenstein |
-| Image | Ubuntu 24.04 |
-| Typ | kleinster Shared-vCPU-Typ (x86 oder Arm, beides funktioniert) |
-| Netzwerk | öffentliche IPv4 und IPv6 |
-| SSH-Key | deinen öffentlichen Key hinzufügen |
-| Cloud config | kompletten Inhalt von `deploy/cloud-init.yaml` einfügen |
-| Name | `signal-scraper` |
+| Systemnutzer `scraper` (ohne Login) | |
+| Code, eigene Python-Version, `.venv`, `.env` | `/opt/advanced-scraper` |
+| `uv` (Python-Paketmanager), falls nicht vorhanden | `/usr/local/bin/uv` |
+| systemd-Dienst und Wochen-Timer | `/etc/systemd/system/indeed-scraper.*` |
 
-Backups und Volumes sind nicht nötig. Alle Daten liegen in Supabase.
+Nicht angefasst werden: Firewall, Webserver, Docker, System-Python und alle anderen Dienste. Der Scraper bekommt eine eigene Python-Version über `uv`, deshalb spielt die Ubuntu-Version keine Rolle.
 
-## 2. Einrichtung prüfen
+Damit er den Dialer und die Website nicht ausbremst, läuft der Dienst mit niedriger CPU- und I/O-Priorität und höchstens 1 GB Arbeitsspeicher.
 
-Nach etwa fünf Minuten:
+## 1. Installieren
+
+Voraussetzung: Die Pull Requests sind auf `main` gemergt.
 
 ```bash
 ssh root@<SERVER-IP>
-cloud-init status --wait      # sollte "status: done" melden
-cat /root/scraper-setup-done  # Zeitstempel der fertigen Einrichtung
+curl -fsSL https://raw.githubusercontent.com/LinusMisselhorn/advanced-scraper/main/deploy/install.sh | bash
 ```
 
-Bei Problemen: `less /var/log/cloud-init-output.log`
-
-## 3. Service-Role-Key eintragen
+## 2. Service-Role-Key eintragen
 
 ```bash
 nano /opt/advanced-scraper/.env
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` mit dem Key aus Supabase (Project Settings, API) ersetzen und speichern. Die Datei ist nur für den Nutzer `scraper` lesbar.
+`SUPABASE_SERVICE_ROLE_KEY` mit dem Key aus Supabase (Project Settings, API) ersetzen. Die Datei ist nur für den Nutzer `scraper` lesbar.
 
-## 4. Testlauf ohne Schreiben
+## 3. Testlauf ohne Schreiben
 
 ```bash
 cd /opt/advanced-scraper
@@ -55,9 +42,9 @@ sudo -u scraper .venv/bin/python -m scraper.indeed_jobspy --dry-run --show-exclu
 Darauf achten:
 
 - **Kommen überhaupt Anzeigen?** Bei 403, 429 oder 0 Treffern blockt Indeed vermutlich die Rechenzentrums-IP. Dann zuerst lokal auf dem eigenen Rechner gegentesten.
-- **Stimmen die Ausschlüsse?** Großarbeitgeber oder Ketten, die durchrutschen, in `scraper/config.py` ergänzen, committen und auf dem Server `scraper-update` ausführen.
+- **Stimmen die Ausschlüsse?** Großarbeitgeber oder Ketten, die durchrutschen, in `scraper/config.py` ergänzen, committen und das Skript erneut ausführen.
 
-## 5. Erster echter Lauf
+## 4. Erster echter Lauf
 
 ```bash
 systemctl start indeed-scraper.service
@@ -66,7 +53,7 @@ journalctl -u indeed-scraper -n 100 --no-pager
 
 Danach in Supabase prüfen, ob Signale vom Typ 1003 angekommen sind.
 
-## 6. Wöchentlichen Lauf aktivieren
+## 5. Wöchentlichen Lauf aktivieren
 
 ```bash
 systemctl enable --now indeed-scraper.timer
@@ -79,17 +66,20 @@ Der Lauf startet montags um 05:30 Uhr deutscher Zeit, mit bis zu 15 Minuten Stre
 
 | Aufgabe | Befehl |
 |---|---|
-| Code aktualisieren | `scraper-update` |
+| Code aktualisieren | `bash /opt/advanced-scraper/deploy/install.sh` |
 | Letzte Läufe ansehen | `journalctl -u indeed-scraper --since "-14 days"` |
 | Lauf per Hand starten | `systemctl start indeed-scraper.service` |
 | Timer stoppen | `systemctl disable --now indeed-scraper.timer` |
+| Komplett entfernen | `systemctl disable --now indeed-scraper.timer; rm /etc/systemd/system/indeed-scraper.*; systemctl daemon-reload; rm -rf /opt/advanced-scraper; userdel scraper` |
 
-Sicherheitsupdates spielt Ubuntu über `unattended-upgrades` selbst ein.
+Das Installationsskript ist idempotent: Mehrfaches Ausführen aktualisiert den Code und die Abhängigkeiten, die `.env` bleibt erhalten.
 
 ## Repo auf privat umstellen
 
-1. Auf dem Server einen Key erzeugen: `sudo -u scraper ssh-keygen -t ed25519 -f /opt/advanced-scraper/.deploy_key -N ""`
-2. Den Inhalt von `.deploy_key.pub` in GitHub unter Settings, Deploy keys als Leserecht eintragen.
-3. Remote umstellen: `cd /opt/advanced-scraper && sudo -u scraper git remote set-url origin git@github.com:LinusMisselhorn/advanced-scraper.git`
+Dann kann der Server nicht mehr ohne Zugangsdaten klonen:
+
+1. Key erzeugen: `sudo -u scraper ssh-keygen -t ed25519 -f /opt/advanced-scraper/.deploy_key -N ""`
+2. Inhalt von `.deploy_key.pub` in GitHub unter Settings, Deploy keys mit Leserecht eintragen.
+3. `cd /opt/advanced-scraper && sudo -u scraper git remote set-url origin git@github.com:LinusMisselhorn/advanced-scraper.git`
 4. `sudo -u scraper git config core.sshCommand "ssh -i /opt/advanced-scraper/.deploy_key -o StrictHostKeyChecking=accept-new"`
-5. Mit `scraper-update` testen.
+5. Skript mit `REPO_URL=git@github.com:LinusMisselhorn/advanced-scraper.git bash /opt/advanced-scraper/deploy/install.sh` testen.

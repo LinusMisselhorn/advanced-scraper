@@ -120,4 +120,4 @@ tests/
 
 ## Betrieb
 
-Der Scraper läuft auf einem Hetzner-Cloud-Server mit wöchentlichem systemd-Timer. Einrichtung und Wartung: [deploy/README.md](deploy/README.md).
+Der Scraper läuft auf dem bestehenden Hetzner-Server (neben Dialer und ai.impression-marketing.de) mit wöchentlichem systemd-Timer. Einrichtung und Wartung: [deploy/README.md](deploy/README.md).
