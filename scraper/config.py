@@ -93,7 +93,6 @@ DEFAULT_EXCLUDED_EMPLOYERS: tuple[str, ...] = (
     "I.K. Hofmann",
     "ARWA",
     "Piening",
-    "Unique",
     "Autovision",
     "Expertum",
     "Jobs in Time",
@@ -126,11 +125,11 @@ DEFAULT_EXCLUDED_DESCRIPTION_PHRASES: tuple[str, ...] = (
     "fuer einen unserer kunden",
     "unser kunde ist",
     "arbeitnehmerueberlassung",
-    "personaldienstleister",
     "personalvermittlung",
-    "zeitarbeit",
     "direktvermittlung",
 )
+# Bewusst nicht enthalten: "zeitarbeit" und "personaldienstleister", weil kleine
+# Betriebe oft "keine Zeitarbeit" schreiben, um sich abzugrenzen.
 
 
 def _env(name: str, default: str | None = None) -> str | None:
